@@ -43,7 +43,7 @@ RUN chown -R 65534:65534 /zeroclaw-data
 
 # ── Stage 2: Production Runtime (Debian slim) ─────────────────
 # Using debian-slim instead of distroless for Render compatibility
-FROM debian:bookworm-slim AS production
+FROM debian:trixie-slim AS production
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
