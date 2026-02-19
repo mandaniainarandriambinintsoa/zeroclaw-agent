@@ -1,0 +1,29 @@
+# render.yaml - ZeroClaw Blueprint for Render
+# Deploy: https://render.com/deploy
+
+services:
+  - type: web
+    name: zeroclaw-agent
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    plan: free
+    region: frankfurt  # EU - closest to Madagascar
+    healthCheckPath: /health
+    envVars:
+      # REQUIRED: Get your free API key at https://console.groq.com
+      - key: GROQ_API_KEY
+        sync: false
+      # Provider config (pre-set for Groq)
+      - key: PROVIDER
+        value: groq
+      - key: ZEROCLAW_MODEL
+        value: llama-3.3-70b-versatile
+      # Gateway config
+      - key: ZEROCLAW_GATEWAY_PORT
+        value: "3000"
+      - key: ZEROCLAW_ALLOW_PUBLIC_BIND
+        value: "true"
+      # Port for Render
+      - key: PORT
+        value: "3000"

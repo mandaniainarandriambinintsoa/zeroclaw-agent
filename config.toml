@@ -1,0 +1,44 @@
+# ZeroClaw Configuration - Groq + Render Free Tier
+# This config is embedded into the Docker image at build time
+
+workspace_dir = "/zeroclaw-data/workspace"
+config_path = "/zeroclaw-data/.zeroclaw/config.toml"
+
+# Groq API key (injected via environment variable at runtime)
+api_key = ""
+
+# LLM Provider: Groq with Llama 3.3 70B
+default_provider = "groq"
+default_model = "llama-3.3-70b-versatile"
+default_temperature = 0.7
+
+# ── Agent Settings ──────────────────────────────────────────
+[agent]
+max_tool_iterations = 10
+
+# ── Gateway (required for Render) ──────────────────────────
+[gateway]
+port = 3000
+host = "[::]"
+allow_public_bind = true
+require_pairing = false
+
+# ── Autonomy ───────────────────────────────────────────────
+[autonomy]
+level = "supervised"
+workspace_only = true
+max_actions_per_hour = 100
+
+# ── Memory (SQLite - lightweight, no external deps) ────────
+[memory]
+backend = "sqlite"
+auto_save = true
+embedding_provider = "none"
+
+# ── Web Search (free, no API key needed) ───────────────────
+# DuckDuckGo is enabled by default
+
+# ── Channel Timeout (faster for cloud APIs) ────────────────
+[channels_config]
+cli = true
+message_timeout_secs = 60
