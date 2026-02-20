@@ -1,47 +1,37 @@
 # Routage des outils
 
-## Emails Gmail → http_request (OBLIGATOIRE)
-Quand l'utilisateur demande ses emails/mails/messages:
+## Emails Gmail (OBLIGATOIRE: suivre ces etapes exactement)
 
-### Etape 1: Lire les credentials
-Appel: file_read avec path = "credentials/google.env"
-Le fichier contient 3 lignes au format CLE=VALEUR. Extraire les valeurs APRES le signe =.
+### Etape 1: Obtenir le token d'acces
+Appel shell avec command: "sh /zeroclaw-data/workspace/scripts/gmail-token.sh"
+Le resultat est le access_token brut (une seule ligne).
 
-### Etape 2: Obtenir un access_token (ATTENTION AU FORMAT)
-Appel http_request avec ces parametres EXACTS:
-- url: "https://oauth2.googleapis.com/token"
-- method: "POST"
-- headers: {"Content-Type": "application/x-www-form-urlencoded"}
-- body: "grant_type=refresh_token&client_id=VALEUR_CLIENT_ID&client_secret=VALEUR_CLIENT_SECRET&refresh_token=VALEUR_REFRESH_TOKEN"
-
-IMPORTANT: le body est une chaine URL-encoded, PAS du JSON. Ne PAS envoyer {"grant_type":"refresh_token",...}
-
-### Etape 3: Lister les messages
-Appel http_request avec:
+### Etape 2: Lister les messages
+Appel http_request:
 - url: "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5"
 - method: "GET"
-- headers: {"Authorization": "Bearer VALEUR_ACCESS_TOKEN"}
+- headers: {"Authorization": "Bearer TOKEN_DE_ETAPE_1"}
 
-### Etape 4: Lire chaque message
-Pour chaque message ID recu:
-- url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/MESSAGE_ID?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date"
+### Etape 3: Lire chaque message
+Pour chaque ID de message:
+- url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/ID_MESSAGE?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date"
 - method: "GET"
-- headers: {"Authorization": "Bearer VALEUR_ACCESS_TOKEN"}
+- headers: {"Authorization": "Bearer TOKEN_DE_ETAPE_1"}
+
+Presenter les resultats: sujet, expediteur, date.
 
 ## Envoyer un email → http_request
-http_request POST https://gmail.googleapis.com/gmail/v1/users/me/messages/send avec body base64.
+Obtenir token (etape 1), puis POST https://gmail.googleapis.com/gmail/v1/users/me/messages/send
 
 ## Recherche web → web_search_tool
-Pour toute question d'actualite, recherche d'info, SEO.
+Pour actualites, recherche d'info, SEO.
 
 ## GitHub → shell
-Utiliser git et gh CLI. Le token GH_TOKEN est deja configure.
+git et gh CLI (GH_TOKEN configure).
 
 ## Memoire → memory_store / memory_recall
-Retenir des infos entre sessions.
 
-## Fichiers → file_read / file_write
-Uniquement pour lire/ecrire des fichiers locaux dans le workspace.
+## Fichiers → file_read / file_write (workspace uniquement)
 
-## APIs externes → http_request
-Google Sheets, Docs, Calendar, YouTube, etc. Meme workflow OAuth que Gmail.
+## APIs Google → http_request
+Sheets, Docs, Calendar, YouTube. Obtenir token avec scripts/gmail-token.sh d'abord.
