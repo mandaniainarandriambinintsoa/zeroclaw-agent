@@ -7,9 +7,9 @@ config_path = "/zeroclaw-data/.zeroclaw/config.toml"
 # Groq API key (injected via environment variable at runtime)
 api_key = ""
 
-# LLM Provider: Groq with DeepSeek R1 70B for reasoning
+# LLM Provider: Groq - Llama 3.3 70B as primary
 default_provider = "groq"
-default_model = "deepseek-r1-distill-llama-70b"
+default_model = "llama-3.3-70b-versatile"
 default_temperature = 0.6
 
 # ── Agent Settings ──────────────────────────────────────────
@@ -23,7 +23,7 @@ tool_dispatcher = "auto"
 fallback_providers = ["groq"]
 
 [reliability.model_fallbacks]
-"deepseek-r1-distill-llama-70b" = ["llama-3.3-70b-versatile", "qwen-qwq-32b"]
+"llama-3.3-70b-versatile" = ["qwen/qwen3-32b", "llama-3.1-8b-instant"]
 
 # ── Gateway (required for Render) ──────────────────────────
 [gateway]
