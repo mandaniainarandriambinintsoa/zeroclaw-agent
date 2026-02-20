@@ -24,6 +24,9 @@ services:
         value: "3000"
       - key: ZEROCLAW_ALLOW_PUBLIC_BIND
         value: "true"
+      # Telegram bot token (set in Render dashboard - never commit the real value)
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
       # Port for Render
       - key: PORT
         value: "3000"

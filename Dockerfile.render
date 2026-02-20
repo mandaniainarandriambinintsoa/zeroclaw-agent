@@ -39,7 +39,8 @@ RUN cargo build --release --locked && \
 RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace
 
 COPY config.toml /zeroclaw-data/.zeroclaw/config.toml
-RUN chown -R 65534:65534 /zeroclaw-data
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R 65534:65534 /zeroclaw-data
 
 # ── Stage 2: Production Runtime (Debian slim) ─────────────────
 # Using debian-slim instead of distroless for Render compatibility
@@ -51,6 +52,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
+COPY --from=builder /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --from=builder /zeroclaw-data /zeroclaw-data
 
 # Environment setup
@@ -72,5 +74,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
     CMD curl -f http://localhost:3000/health || exit 1
 
-ENTRYPOINT ["zeroclaw"]
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["gateway"]

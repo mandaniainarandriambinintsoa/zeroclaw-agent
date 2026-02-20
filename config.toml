@@ -45,3 +45,11 @@ embedding_provider = "none"
 [channels_config]
 cli = true
 message_timeout_secs = 60
+
+# ── Telegram Channel ────────────────────────────────────────
+# bot_token is injected at runtime via TELEGRAM_BOT_TOKEN env var
+[channels_config.telegram]
+bot_token = ""
+allowed_users = ["8202028798"]
+interrupt_on_new_message = true
+mention_only = false
