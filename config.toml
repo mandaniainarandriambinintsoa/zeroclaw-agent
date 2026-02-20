@@ -7,14 +7,22 @@ config_path = "/zeroclaw-data/.zeroclaw/config.toml"
 # Groq API key (injected via environment variable at runtime)
 api_key = ""
 
-# LLM Provider: Groq with Llama 3.3 70B
+# LLM Provider: Groq - fast model by default, 70B as fallback
 default_provider = "groq"
-default_model = "llama-3.3-70b-versatile"
+default_model = "llama-3.1-8b-instant"
 default_temperature = 0.7
 
 # ── Agent Settings ──────────────────────────────────────────
 [agent]
 max_tool_iterations = 10
+
+# ── Model Fallback Chain ─────────────────────────────────────
+# If llama-3.1-8b-instant is rate-limited, fall back to 70B
+[reliability]
+fallback_providers = ["groq"]
+
+[reliability.model_fallbacks]
+"llama-3.1-8b-instant" = ["llama-3.3-70b-versatile", "llama3-8b-8192"]
 
 # ── Gateway (required for Render) ──────────────────────────
 [gateway]
