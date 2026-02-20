@@ -1,5 +1,5 @@
-# ZeroClaw Configuration - Groq + Render Free Tier
-# This config is embedded into the Docker image at build time
+# ZeroClaw Configuration - Agent Autonome Complet
+# Groq + DeepSeek R1 70B (reasoning) + Render Free Tier
 
 workspace_dir = "/zeroclaw-data/workspace"
 config_path = "/zeroclaw-data/.zeroclaw/config.toml"
@@ -7,22 +7,23 @@ config_path = "/zeroclaw-data/.zeroclaw/config.toml"
 # Groq API key (injected via environment variable at runtime)
 api_key = ""
 
-# LLM Provider: Groq - fast model by default, 70B as fallback
+# LLM Provider: Groq with DeepSeek R1 70B for reasoning
 default_provider = "groq"
-default_model = "llama-3.1-8b-instant"
-default_temperature = 0.7
+default_model = "deepseek-r1-distill-llama-70b"
+default_temperature = 0.6
 
 # ── Agent Settings ──────────────────────────────────────────
 [agent]
-max_tool_iterations = 10
+max_tool_iterations = 30
+max_history_messages = 100
+tool_dispatcher = "auto"
 
 # ── Model Fallback Chain ─────────────────────────────────────
-# If llama-3.1-8b-instant is rate-limited, fall back to 70B
 [reliability]
 fallback_providers = ["groq"]
 
 [reliability.model_fallbacks]
-"llama-3.1-8b-instant" = ["llama-3.3-70b-versatile", "llama3-8b-8192"]
+"deepseek-r1-distill-llama-70b" = ["llama-3.3-70b-versatile", "qwen-qwq-32b"]
 
 # ── Gateway (required for Render) ──────────────────────────
 [gateway]
@@ -33,21 +34,35 @@ require_pairing = false
 
 # ── Autonomy ───────────────────────────────────────────────
 [autonomy]
-level = "supervised"
-workspace_only = true
-allowed_commands = ["git", "npm", "cargo", "ls", "cat", "grep", "find", "echo", "pwd", "wc", "head", "tail"]
-forbidden_paths = ["/etc", "/root", "/home", "/usr", "/bin", "/sbin", "/lib", "/opt", "/boot", "/dev", "/proc", "/sys", "/var", "/tmp", "~/.ssh", "~/.gnupg", "~/.aws", "~/.config"]
-max_actions_per_hour = 100
-max_cost_per_day_cents = 500
+level = "full"
+workspace_only = false
+allowed_commands = ["git", "gh", "curl", "ls", "cat", "grep", "find", "echo",
+                    "pwd", "wc", "head", "tail", "mkdir", "cp", "mv", "rm",
+                    "chmod", "tar", "unzip", "sed", "awk", "sort", "diff"]
+forbidden_paths = ["/etc/shadow", "/etc/passwd", "/root/.ssh"]
+max_actions_per_hour = 200
+max_cost_per_day_cents = 0
+require_approval_for_medium_risk = false
+block_high_risk_commands = false
+auto_approve = ["file_read", "file_write", "memory_recall", "memory_store",
+                "web_search_tool", "http_request", "git_operations", "shell"]
+
+# ── Web Search ───────────────────────────────────────────────
+[web_search]
+enabled = true
+provider = "duckduckgo"
+max_results = 5
+
+# ── HTTP Requests ────────────────────────────────────────────
+[http_request]
+enabled = true
+timeout_secs = 30
 
 # ── Memory (SQLite - lightweight, no external deps) ────────
 [memory]
 backend = "sqlite"
 auto_save = true
 embedding_provider = "none"
-
-# ── Web Search (free, no API key needed) ───────────────────
-# DuckDuckGo is enabled by default
 
 # ── Channel Timeout (faster for cloud APIs) ────────────────
 [channels_config]

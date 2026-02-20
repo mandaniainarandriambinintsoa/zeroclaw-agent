@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# ZeroClaw - Optimized for Render Free Tier
-# Uses multi-stage build to minimize final image size
+# ZeroClaw - Agent Autonome Complet
+# Optimized for Render Free Tier with git + gh CLI
 
 # ── Stage 1: Build ────────────────────────────────────────────
 FROM rust:1.93-slim AS builder
@@ -35,20 +35,28 @@ RUN cargo build --release --locked && \
     cp target/release/zeroclaw /app/zeroclaw && \
     strip /app/zeroclaw
 
-# Prepare runtime directory with Groq config
-RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace
+# Prepare runtime directory
+RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace /zeroclaw-data/credentials
 
 COPY config.toml /zeroclaw-data/.zeroclaw/config.toml
+COPY workspace/ /zeroclaw-data/workspace/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R 65534:65534 /zeroclaw-data
 
 # ── Stage 2: Production Runtime (Debian slim) ─────────────────
-# Using debian-slim instead of distroless for Render compatibility
 FROM debian:trixie-slim AS production
 
+# Install runtime deps: ca-certificates, curl, git, gh CLI
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
+    git \
+    gpg \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+       > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
@@ -59,7 +67,7 @@ COPY --from=builder /zeroclaw-data /zeroclaw-data
 ENV ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace
 ENV HOME=/zeroclaw-data
 ENV PROVIDER=groq
-ENV ZEROCLAW_MODEL=llama-3.3-70b-versatile
+ENV ZEROCLAW_MODEL=deepseek-r1-distill-llama-70b
 ENV ZEROCLAW_GATEWAY_PORT=3000
 ENV ZEROCLAW_ALLOW_PUBLIC_BIND=true
 
