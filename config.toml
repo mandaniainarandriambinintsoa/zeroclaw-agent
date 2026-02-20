@@ -1,8 +1,5 @@
-# ZeroClaw Configuration - Agent Autonome Complet
-# Groq + DeepSeek R1 70B (reasoning) + Render Free Tier
-
-workspace_dir = "/zeroclaw-data/workspace"
-config_path = "/zeroclaw-data/.zeroclaw/config.toml"
+# ZeroClaw Configuration - Agent Autonome
+# Groq + Llama 3.3 70B + Render Free Tier
 
 # Groq API key (injected via environment variable at runtime)
 api_key = ""
@@ -14,13 +11,16 @@ default_temperature = 0.6
 
 # ── Agent Settings ──────────────────────────────────────────
 [agent]
+compact_context = true
 max_tool_iterations = 30
-max_history_messages = 100
+max_history_messages = 50
 tool_dispatcher = "auto"
 
 # ── Model Fallback Chain ─────────────────────────────────────
 [reliability]
 fallback_providers = ["groq"]
+provider_retries = 3
+provider_backoff_ms = 2000
 
 [reliability.model_fallbacks]
 "llama-3.3-70b-versatile" = ["qwen/qwen3-32b", "llama-3.1-8b-instant"]
