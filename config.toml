@@ -57,6 +57,21 @@ max_results = 5
 [http_request]
 enabled = true
 timeout_secs = 30
+allowed_domains = [
+    "gmail.googleapis.com",
+    "www.googleapis.com",
+    "oauth2.googleapis.com",
+    "api.github.com",
+    "sheets.googleapis.com",
+    "docs.googleapis.com",
+    "drive.googleapis.com",
+    "calendar.googleapis.com",
+    "people.googleapis.com",
+    "youtube.googleapis.com",
+    "www.blogger.com",
+    "tasks.googleapis.com",
+    "slides.googleapis.com"
+]
 
 # ── Memory (SQLite - lightweight, no external deps) ────────
 [memory]
