@@ -2,7 +2,7 @@
 
 ## Emails Gmail → http_request (OBLIGATOIRE)
 Quand l'utilisateur demande ses emails/mails/messages:
-1. file_read `/zeroclaw-data/credentials/google.env` → extraire CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
+1. file_read `credentials/google.env` → extraire CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
 2. http_request POST `https://oauth2.googleapis.com/token` body: `grant_type=refresh_token&client_id=CLIENT_ID&client_secret=CLIENT_SECRET&refresh_token=REFRESH_TOKEN` headers: `{"Content-Type":"application/x-www-form-urlencoded"}` → extraire access_token
 3. http_request GET `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5` headers: `{"Authorization":"Bearer ACCESS_TOKEN"}` → liste des message IDs
 4. Pour chaque message: http_request GET `https://gmail.googleapis.com/gmail/v1/users/me/messages/MESSAGE_ID` headers: `{"Authorization":"Bearer ACCESS_TOKEN"}`

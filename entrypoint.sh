@@ -11,7 +11,8 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
 fi
 
 # ── Google OAuth credentials (for Gmail API) ──────────────────
-CRED_DIR=/zeroclaw-data/credentials
+# MUST be inside workspace so file_read tool can access it
+CRED_DIR=/zeroclaw-data/workspace/credentials
 mkdir -p "$CRED_DIR" 2>/dev/null || true
 
 if [ -n "$GOOGLE_CLIENT_ID" ] || [ -n "$GOOGLE_CLIENT_SECRET" ] || [ -n "$GOOGLE_REFRESH_TOKEN" ]; then
