@@ -1,12 +1,12 @@
 # ZeroClaw Configuration - Agent Autonome
-# Groq + Llama 3.3 70B + Render Free Tier
+# OpenAI gpt-4o-mini (primary) + Groq (fallback gratuit)
 
-# Groq API key (injected via environment variable at runtime)
-api_key = ""
+# API key resolved per-provider via env vars:
+# OPENAI_API_KEY for openai, GROQ_API_KEY for groq
 
-# LLM Provider: Groq - Llama 3.3 70B as primary
-default_provider = "groq"
-default_model = "llama-3.3-70b-versatile"
+# LLM Provider: OpenAI gpt-4o-mini (~$0.20/1000 messages)
+default_provider = "openai"
+default_model = "gpt-4o-mini"
 default_temperature = 0.6
 
 # ── Agent Settings ──────────────────────────────────────────
@@ -16,14 +16,14 @@ max_tool_iterations = 30
 max_history_messages = 50
 tool_dispatcher = "auto"
 
-# ── Model Fallback Chain ─────────────────────────────────────
+# ── Fallback: Groq (gratuit) si OpenAI down ────────────────
 [reliability]
 fallback_providers = ["groq"]
-provider_retries = 3
-provider_backoff_ms = 2000
+provider_retries = 2
+provider_backoff_ms = 1000
 
 [reliability.model_fallbacks]
-"llama-3.3-70b-versatile" = ["qwen/qwen3-32b", "llama-3.1-8b-instant"]
+"gpt-4o-mini" = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
 # ── Gateway (required for Render) ──────────────────────────
 [gateway]
@@ -79,13 +79,12 @@ backend = "sqlite"
 auto_save = true
 embedding_provider = "none"
 
-# ── Channel Timeout (faster for cloud APIs) ────────────────
+# ── Channel Timeout ──────────────────────────────────────────
 [channels_config]
 cli = true
 message_timeout_secs = 60
 
 # ── Telegram Channel ────────────────────────────────────────
-# bot_token is injected at runtime via TELEGRAM_BOT_TOKEN env var
 [channels_config.telegram]
 bot_token = ""
 allowed_users = ["8202028798"]

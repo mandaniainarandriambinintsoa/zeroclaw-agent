@@ -67,7 +67,7 @@ COPY --from=builder /zeroclaw-data /zeroclaw-data
 ENV ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace
 ENV HOME=/zeroclaw-data
 ENV PROVIDER=groq
-ENV ZEROCLAW_MODEL=llama-3.3-70b-versatile
+ENV ZEROCLAW_MODEL=gpt-4o-mini
 ENV ZEROCLAW_GATEWAY_PORT=3000
 ENV ZEROCLAW_ALLOW_PUBLIC_BIND=true
 
