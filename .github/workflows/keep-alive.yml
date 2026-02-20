@@ -1,0 +1,14 @@
+name: Keep Alive
+
+on:
+  schedule:
+    # Every 10 minutes — keeps Render free tier from spinning down
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: curl -sf https://zeroclaw-agent.onrender.com/health -o /dev/null -w "%{http_code}\n"
