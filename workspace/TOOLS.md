@@ -1,44 +1,22 @@
 # Routage des outils
 
-## Emails Gmail (OBLIGATOIRE: suivre ces instructions exactement)
+## Emails Gmail
 
-Tu DOIS utiliser les scripts shell ci-dessous. Ne JAMAIS construire les requetes manuellement.
+TOUTES les operations Gmail utilisent UN SEUL appel shell. Ne JAMAIS utiliser http_request pour Gmail.
 
-### Lire les emails (3 etapes — FAIRE LES 3 AUTOMATIQUEMENT, ne PAS s'arreter)
-
-**Etape 1**: Obtenir le token via shell
+### Lire les emails (1 seule commande)
 ```json
-{"command": "sh /zeroclaw-data/workspace/scripts/gmail-token.sh"}
+{"command": "sh /zeroclaw-data/workspace/scripts/gmail-read.sh 5"}
 ```
-
-**Etape 2**: Lister les IDs des messages via http_request
-```json
-{
-  "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5",
-  "method": "GET",
-  "headers": {"Authorization": "Bearer ACCESS_TOKEN_ETAPE_1"}
-}
-```
-
-**Etape 3 (OBLIGATOIRE — ne JAMAIS sauter cette etape)**: Pour CHAQUE ID obtenu a l'etape 2, lire le contenu via http_request:
-```json
-{
-  "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/MESSAGE_ID?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date",
-  "method": "GET",
-  "headers": {"Authorization": "Bearer ACCESS_TOKEN_ETAPE_1"}
-}
-```
-
-**IMPORTANT**: Quand l'utilisateur demande de lire ses emails, tu DOIS enchainer les 3 etapes AUTOMATIQUEMENT et presenter les resultats (sujet, expediteur, date). Ne JAMAIS afficher les IDs bruts a l'utilisateur. Ne JAMAIS demander quel ID lire. TOUJOURS lire tous les messages et montrer le contenu.
+Le nombre a la fin est le nombre d'emails a lire (3, 5, 10...).
+Le script affiche directement: expediteur, sujet, date. Presente le resultat tel quel.
 
 ### Envoyer un email (1 seule commande)
-Appel outil "shell":
 ```json
 {"command": "sh /zeroclaw-data/workspace/scripts/gmail-send.sh 'destinataire@email.com' 'Sujet du mail' 'Contenu du message'"}
 ```
 
 ### Creer un brouillon (1 seule commande)
-Appel outil "shell":
 ```json
 {"command": "sh /zeroclaw-data/workspace/scripts/gmail-draft.sh 'destinataire@email.com' 'Sujet du mail' 'Contenu du message'"}
 ```
