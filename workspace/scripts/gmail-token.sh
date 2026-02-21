@@ -23,8 +23,13 @@ RESPONSE=$(curl -s -X POST https://oauth2.googleapis.com/token \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "grant_type=refresh_token&client_id=${GOOGLE_CLIENT_ID}&client_secret=${GOOGLE_CLIENT_SECRET}&refresh_token=${GOOGLE_REFRESH_TOKEN}")
 
-# Extract access_token (simple grep, no jq dependency)
-TOKEN=$(echo "$RESPONSE" | grep -o '"access_token": *"[^"]*"' | head -1 | sed 's/"access_token": *"//;s/"$//')
+# Extract access_token using jq (with grep fallback)
+TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty' 2>/dev/null)
+
+if [ -z "$TOKEN" ]; then
+    # Fallback: grep-based extraction
+    TOKEN=$(echo "$RESPONSE" | grep -o '"access_token": *"[^"]*"' | head -1 | sed 's/"access_token": *"//;s/"$//')
+fi
 
 if [ -z "$TOKEN" ]; then
     echo "ERROR: failed to get access token. Response: $RESPONSE" >&2

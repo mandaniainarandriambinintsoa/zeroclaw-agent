@@ -1,8 +1,7 @@
 #!/bin/sh
-# Read latest emails from Gmail in one shot
+# Read latest emails from Gmail using jq for reliable JSON parsing
 # Usage: sh scripts/gmail-read.sh [count]
-# Output: formatted email list (subject, from, date)
-# All output goes to stdout so the bot can see it
+# Output: formatted email list (from, subject, date, snippet)
 
 COUNT="${1:-5}"
 
@@ -19,14 +18,14 @@ LIST=$(curl -s -H "Authorization: Bearer $TOKEN" \
     "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${COUNT}")
 
 # Check for API error
-API_ERROR=$(echo "$LIST" | grep -o '"message": *"[^"]*"' | head -1 | sed 's/"message": *"//;s/"$//')
+API_ERROR=$(echo "$LIST" | jq -r '.error.message // empty' 2>/dev/null)
 if [ -n "$API_ERROR" ]; then
     echo "ERREUR API Gmail: $API_ERROR"
     exit 0
 fi
 
 # Extract IDs
-IDS=$(echo "$LIST" | grep -o '"id": *"[^"]*"' | sed 's/"id": *"//;s/"$//')
+IDS=$(echo "$LIST" | jq -r '.messages[]?.id' 2>/dev/null)
 
 if [ -z "$IDS" ]; then
     echo "Aucun email trouve dans la boite de reception."
@@ -41,9 +40,10 @@ for MSG_ID in $IDS; do
     MSG=$(curl -s -H "Authorization: Bearer $TOKEN" \
         "https://gmail.googleapis.com/gmail/v1/users/me/messages/${MSG_ID}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date")
 
-    SUBJECT=$(echo "$MSG" | grep -o '"Subject", *"value": *"[^"]*"' | sed 's/.*"value": *"//;s/"$//' | head -1)
-    FROM=$(echo "$MSG" | grep -o '"From", *"value": *"[^"]*"' | sed 's/.*"value": *"//;s/"$//' | head -1)
-    DATE=$(echo "$MSG" | grep -o '"Date", *"value": *"[^"]*"' | sed 's/.*"value": *"//;s/"$//' | head -1)
+    SUBJECT=$(echo "$MSG" | jq -r '.payload.headers[] | select(.name=="Subject") | .value' 2>/dev/null | head -1)
+    FROM=$(echo "$MSG" | jq -r '.payload.headers[] | select(.name=="From") | .value' 2>/dev/null | head -1)
+    DATE=$(echo "$MSG" | jq -r '.payload.headers[] | select(.name=="Date") | .value' 2>/dev/null | head -1)
+    SNIPPET=$(echo "$MSG" | jq -r '.snippet // empty' 2>/dev/null)
 
     [ -z "$SUBJECT" ] && SUBJECT="(sans sujet)"
     [ -z "$FROM" ] && FROM="(inconnu)"
@@ -52,6 +52,9 @@ for MSG_ID in $IDS; do
     echo "${INDEX}. De: ${FROM}"
     echo "   Sujet: ${SUBJECT}"
     echo "   Date: ${DATE}"
+    if [ -n "$SNIPPET" ]; then
+        echo "   Apercu: ${SNIPPET}"
+    fi
     echo ""
     INDEX=$((INDEX + 1))
 done

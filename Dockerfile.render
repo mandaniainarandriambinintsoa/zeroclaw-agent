@@ -46,12 +46,13 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && chown -R 65534:65534 /zeroclaw-data
 # ── Stage 2: Production Runtime (Debian slim) ─────────────────
 FROM debian:trixie-slim AS production
 
-# Install runtime deps: ca-certificates, curl, git, gh CLI
+# Install runtime deps: ca-certificates, curl, git, gh CLI, jq
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     git \
     gpg \
+    jq \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
        | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
