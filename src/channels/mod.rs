@@ -1973,15 +1973,49 @@ pub async fn start_channels(config: Config) -> Result<()> {
     } else {
         None
     };
+
+    // When the provider supports native function calling (e.g. OpenAI),
+    // do NOT inject XML <tool_call> protocol into the system prompt.
+    // The tools are sent via the API's native tool/function interface.
+    // Injecting XML instructions creates conflicting signals that confuse
+    // the model and prevent it from calling tools properly.
+    let native_tools = provider.supports_native_tools();
+    let effective_tool_descs: Vec<(&str, &str)> = if native_tools {
+        vec![] // tools are declared via native function calling
+    } else {
+        tool_descs
+    };
     let mut system_prompt = build_system_prompt(
         &workspace,
         &model,
-        &tool_descs,
+        &effective_tool_descs,
         &skills,
         Some(&config.identity),
         bootstrap_max_chars,
     );
-    system_prompt.push_str(&build_tool_instructions(tools_registry.as_ref()));
+    if !native_tools {
+        system_prompt.push_str(&build_tool_instructions(tools_registry.as_ref()));
+    }
+    // When using native tools, rewrite the "Your Task" instruction to not
+    // reference XML <tool_call> tags (the model should use its native
+    // function calling mechanism instead).
+    if native_tools {
+        system_prompt = system_prompt.replace(
+            "Instead: emit actual <tool_call> tags when you need to act. Just do what they ask.",
+            "Instead: use your available tools/functions when you need to act. Just do what they ask.",
+        );
+    }
+
+    // Log tool dispatch mode for diagnostics
+    println!(
+        "  🔧 Native tools: {} | Tools registered: {}",
+        native_tools,
+        tools_registry.len()
+    );
+    if native_tools {
+        let tool_names: Vec<&str> = tools_registry.iter().map(|t| t.name()).collect();
+        println!("  🔧 Tool names: {}", tool_names.join(", "));
+    }
 
     if !skills.is_empty() {
         println!(
