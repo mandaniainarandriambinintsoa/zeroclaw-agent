@@ -1,18 +1,17 @@
 # Routage des outils
 
-## Emails Gmail (OBLIGATOIRE: suivre ces etapes exactement)
+## Emails Gmail (OBLIGATOIRE: suivre ces instructions exactement)
 
-Tu DOIS suivre ces 3 etapes dans l'ordre. Ne JAMAIS sauter d'etape.
+Tu DOIS utiliser les scripts shell ci-dessous. Ne JAMAIS construire les requetes manuellement.
 
-### Etape 1: Obtenir le token d'acces
-Appel outil "shell" avec:
+### Lire les emails (3 etapes)
+
+**Etape 1**: Obtenir le token
 ```json
 {"command": "sh /zeroclaw-data/workspace/scripts/gmail-token.sh"}
 ```
-Le resultat est le access_token brut (une seule ligne). Sauvegarde-le pour les etapes suivantes.
 
-### Etape 2: Lister les messages
-Appel outil "http_request" avec:
+**Etape 2**: Lister les messages avec le token obtenu
 ```json
 {
   "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5",
@@ -20,10 +19,8 @@ Appel outil "http_request" avec:
   "headers": {"Authorization": "Bearer ACCESS_TOKEN_ETAPE_1"}
 }
 ```
-Remplacer ACCESS_TOKEN_ETAPE_1 par le token obtenu a l'etape 1.
 
-### Etape 3: Lire chaque message
-Pour chaque ID de message obtenu a l'etape 2, appel "http_request":
+**Etape 3**: Lire chaque message par ID
 ```json
 {
   "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/MESSAGE_ID?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date",
@@ -31,18 +28,39 @@ Pour chaque ID de message obtenu a l'etape 2, appel "http_request":
   "headers": {"Authorization": "Bearer ACCESS_TOKEN_ETAPE_1"}
 }
 ```
-Presenter les resultats: sujet, expediteur, date.
 
-## Envoyer un email
-Etape 1: obtenir token (meme commande shell ci-dessus).
-Etape 2: appel "http_request" POST https://gmail.googleapis.com/gmail/v1/users/me/messages/send avec le token Bearer.
+### Envoyer un email (1 seule commande)
+Appel outil "shell":
+```json
+{"command": "sh /zeroclaw-data/workspace/scripts/gmail-send.sh 'destinataire@email.com' 'Sujet du mail' 'Contenu du message'"}
+```
 
-## GitHub
-Utiliser l'outil "shell" avec les commandes gh CLI. L'authentification est deja configuree.
-Exemples:
-- Lister les repos: `{"command": "gh repo list"}`
-- Voir les issues: `{"command": "gh issue list"}`
-- Creer un repo: `{"command": "gh repo create nom-du-repo --public"}`
+### Creer un brouillon (1 seule commande)
+Appel outil "shell":
+```json
+{"command": "sh /zeroclaw-data/workspace/scripts/gmail-draft.sh 'destinataire@email.com' 'Sujet du mail' 'Contenu du message'"}
+```
+
+## GitHub (utiliser outil "shell" avec gh CLI)
+
+L'authentification est deja configuree. Exemples:
+
+### Repos
+- Lister: `{"command": "gh repo list"}`
+- Creer: `{"command": "gh repo create nom-du-repo --public"}`
+- Cloner: `{"command": "gh repo clone owner/repo"}`
+
+### Pull Requests
+- Lister: `{"command": "gh pr list"}`
+- Voir une PR: `{"command": "gh pr view 123"}`
+- Creer une PR: `{"command": "gh pr create --title 'Titre' --body 'Description'"}`
+- Merge une PR: `{"command": "gh pr merge 123"}`
+- Commenter: `{"command": "gh pr comment 123 --body 'Mon commentaire'"}`
+
+### Issues
+- Lister: `{"command": "gh issue list"}`
+- Creer: `{"command": "gh issue create --title 'Titre' --body 'Description'"}`
+- Commenter: `{"command": "gh issue comment 123 --body 'Mon commentaire'"}`
 
 ## Recherche web
 Utiliser l'outil "web_search_tool" pour actualites, recherche d'info, SEO.
@@ -56,7 +74,8 @@ Utiliser l'outil "web_search_tool" pour actualites, recherche d'info, SEO.
 - Ecrire: outil "file_write" (workspace uniquement)
 
 ## APIs Google (Sheets, Docs, Calendar, YouTube)
-Utiliser http_request. Obtenir le token d'abord avec:
+Obtenir le token d'abord:
 ```json
 {"command": "sh /zeroclaw-data/workspace/scripts/gmail-token.sh"}
 ```
+Puis utiliser "http_request" avec le Bearer token.
