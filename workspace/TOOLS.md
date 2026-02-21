@@ -4,14 +4,14 @@
 
 Tu DOIS utiliser les scripts shell ci-dessous. Ne JAMAIS construire les requetes manuellement.
 
-### Lire les emails (3 etapes)
+### Lire les emails (3 etapes — FAIRE LES 3 AUTOMATIQUEMENT, ne PAS s'arreter)
 
-**Etape 1**: Obtenir le token
+**Etape 1**: Obtenir le token via shell
 ```json
 {"command": "sh /zeroclaw-data/workspace/scripts/gmail-token.sh"}
 ```
 
-**Etape 2**: Lister les messages avec le token obtenu
+**Etape 2**: Lister les IDs des messages via http_request
 ```json
 {
   "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5",
@@ -20,7 +20,7 @@ Tu DOIS utiliser les scripts shell ci-dessous. Ne JAMAIS construire les requetes
 }
 ```
 
-**Etape 3**: Lire chaque message par ID
+**Etape 3 (OBLIGATOIRE — ne JAMAIS sauter cette etape)**: Pour CHAQUE ID obtenu a l'etape 2, lire le contenu via http_request:
 ```json
 {
   "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/MESSAGE_ID?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date",
@@ -28,6 +28,8 @@ Tu DOIS utiliser les scripts shell ci-dessous. Ne JAMAIS construire les requetes
   "headers": {"Authorization": "Bearer ACCESS_TOKEN_ETAPE_1"}
 }
 ```
+
+**IMPORTANT**: Quand l'utilisateur demande de lire ses emails, tu DOIS enchainer les 3 etapes AUTOMATIQUEMENT et presenter les resultats (sujet, expediteur, date). Ne JAMAIS afficher les IDs bruts a l'utilisateur. Ne JAMAIS demander quel ID lire. TOUJOURS lire tous les messages et montrer le contenu.
 
 ### Envoyer un email (1 seule commande)
 Appel outil "shell":
