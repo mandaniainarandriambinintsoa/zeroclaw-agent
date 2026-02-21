@@ -36,7 +36,7 @@ RUN cargo build --release --locked && \
     strip /app/zeroclaw
 
 # Prepare runtime directory
-RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace /zeroclaw-data/credentials
+RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace /zeroclaw-data/credentials /zeroclaw-data/.config/gh
 
 COPY config.toml /zeroclaw-data/.zeroclaw/config.toml
 COPY workspace/ /zeroclaw-data/workspace/
