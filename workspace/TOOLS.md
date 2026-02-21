@@ -37,6 +37,22 @@ Outil: **web_search_tool**
 - Lire: outil **file_read** (workspace uniquement)
 - Ecrire: outil **file_write** (workspace uniquement)
 
+## Dev Workflow (delegation au PC local)
+
+Quand l'utilisateur demande de developper/coder/fixer quelque chose dans un projet:
+
+1. Lire le skill: `workspace/skills/dev-workflow/SKILL.md`
+2. Creer une issue GitHub avec les labels `dev-task,pending` sur le bon repo
+3. L'agent local sur le PC de Manda detecte et traite automatiquement
+
+Projets configures:
+- **factumation** / **factupro** → repo `mandaniainarandriambinintsoa/Factumation`
+
+Commande type:
+```
+gh issue create --repo mandaniainarandriambinintsoa/Factumation --title "[dev-task] factumation: DESCRIPTION" --body "## Tache\nDETAILS" --label "dev-task,pending"
+```
+
 ## APIs Google (Sheets, Docs, Calendar, YouTube)
 Token: shell command = `sh /zeroclaw-data/workspace/scripts/gmail-token.sh`
 Puis utiliser outil **http_request** avec le Bearer token.
