@@ -8,8 +8,9 @@ COUNT="${1:-5}"
 # Step 1: Get access token
 SCRIPT_DIR="$(dirname "$0")"
 TOKEN=$("$SCRIPT_DIR/gmail-token.sh" 2>&1)
-if [ $? -ne 0 ] || [ -z "$TOKEN" ]; then
-    echo "ERREUR: impossible d'obtenir le token Gmail. Detail: $TOKEN"
+TOKEN_EXIT=$?
+if [ $TOKEN_EXIT -ne 0 ] || [ -z "$TOKEN" ]; then
+    echo "ERREUR TOKEN (exit=$TOKEN_EXIT): $TOKEN"
     exit 0
 fi
 
@@ -17,10 +18,17 @@ fi
 LIST=$(curl -s -H "Authorization: Bearer $TOKEN" \
     "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${COUNT}")
 
-# Check for API error
-API_ERROR=$(echo "$LIST" | jq -r '.error.message // empty' 2>/dev/null)
-if [ -n "$API_ERROR" ]; then
-    echo "ERREUR API Gmail: $API_ERROR"
+# Check for API error (show full error details)
+API_ERROR_CODE=$(echo "$LIST" | jq -r '.error.code // empty' 2>/dev/null)
+API_ERROR_MSG=$(echo "$LIST" | jq -r '.error.message // empty' 2>/dev/null)
+API_ERROR_STATUS=$(echo "$LIST" | jq -r '.error.status // empty' 2>/dev/null)
+if [ -n "$API_ERROR_CODE" ]; then
+    echo "ERREUR API Gmail (code=$API_ERROR_CODE, status=$API_ERROR_STATUS): $API_ERROR_MSG"
+    # Show error details for scope issues
+    API_ERROR_DETAILS=$(echo "$LIST" | jq -r '.error.errors[]?.reason // empty' 2>/dev/null)
+    if [ -n "$API_ERROR_DETAILS" ]; then
+        echo "Raison: $API_ERROR_DETAILS"
+    fi
     exit 0
 fi
 
@@ -28,7 +36,8 @@ fi
 IDS=$(echo "$LIST" | jq -r '.messages[]?.id' 2>/dev/null)
 
 if [ -z "$IDS" ]; then
-    echo "Aucun email trouve dans la boite de reception."
+    echo "Aucun email trouve. Reponse API brute (100 premiers chars):"
+    echo "$LIST" | head -c 100
     exit 0
 fi
 

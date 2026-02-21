@@ -14,7 +14,7 @@ fi
 . "$CRED_FILE"
 
 if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ] || [ -z "$GOOGLE_REFRESH_TOKEN" ]; then
-    echo "ERROR: missing Google OAuth credentials" >&2
+    echo "ERROR: missing Google OAuth credentials (ID=${GOOGLE_CLIENT_ID:+set} SECRET=${GOOGLE_CLIENT_SECRET:+set} REFRESH=${GOOGLE_REFRESH_TOKEN:+set})" >&2
     exit 1
 fi
 
@@ -32,7 +32,9 @@ if [ -z "$TOKEN" ]; then
 fi
 
 if [ -z "$TOKEN" ]; then
-    echo "ERROR: failed to get access token. Response: $RESPONSE" >&2
+    # Show the error from Google's OAuth endpoint
+    ERROR_DESC=$(echo "$RESPONSE" | jq -r '.error_description // .error // empty' 2>/dev/null)
+    echo "ERROR: failed to get access token. Error: ${ERROR_DESC:-unknown}. Full response: $RESPONSE" >&2
     exit 1
 fi
 
