@@ -24,9 +24,21 @@ EOF
 fi
 
 # ── GitHub CLI auth ───────────────────────────────────────────
-# Persist token to gh config file (survives shell env_clear)
+# Write token to file (for scripts) AND gh config (for gh CLI)
 if [ -n "$GITHUB_TOKEN" ]; then
-    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+    # 1. Save token to credential file (readable by shell scripts)
+    echo "$GITHUB_TOKEN" > "$CRED_DIR/github.token"
+
+    # 2. Write gh CLI config directly (no dependency on gh auth login)
+    GH_CONFIG_DIR="$HOME/.config/gh"
+    mkdir -p "$GH_CONFIG_DIR" 2>/dev/null || true
+    cat > "$GH_CONFIG_DIR/hosts.yml" <<GHEOF
+github.com:
+    oauth_token: ${GITHUB_TOKEN}
+    user: ""
+    git_protocol: https
+GHEOF
+
     git config --global credential.helper store 2>/dev/null || true
 fi
 
