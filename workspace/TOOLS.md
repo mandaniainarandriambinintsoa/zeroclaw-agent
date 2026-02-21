@@ -1,24 +1,12 @@
 # Routage des outils
 
-REGLE: pour Gmail et GitHub, tu DOIS appeler l'outil **shell** avec le parametre **command**. Ne decris jamais les scripts, execute-les.
-
 ## Emails Gmail
 
-Appelle l'outil **shell** avec ces commandes. UN SEUL appel suffit pour chaque operation.
+Tu as 3 outils Gmail dedies. Utilise-les DIRECTEMENT:
 
-### Lire les emails
-Outil: **shell**
-command: `sh /zeroclaw-data/workspace/scripts/gmail-read.sh 5`
-(remplace 5 par le nombre voulu: 3, 5, 10...)
-Le script affiche expediteur, sujet, date. Presente le resultat tel quel a l'utilisateur.
-
-### Envoyer un email
-Outil: **shell**
-command: `sh /zeroclaw-data/workspace/scripts/gmail-send.sh 'destinataire@email.com' 'Sujet' 'Contenu du message'`
-
-### Creer un brouillon
-Outil: **shell**
-command: `sh /zeroclaw-data/workspace/scripts/gmail-draft.sh 'destinataire@email.com' 'Sujet' 'Contenu du message'`
+- **gmail_read** : lire les emails (parametre: count)
+- **gmail_send** : envoyer un email (parametres: to, subject, body)
+- **gmail_draft** : creer un brouillon (parametres: to, subject, body)
 
 ## GitHub
 

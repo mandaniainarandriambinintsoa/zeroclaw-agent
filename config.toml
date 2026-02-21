@@ -46,7 +46,8 @@ max_cost_per_day_cents = 0
 require_approval_for_medium_risk = false
 block_high_risk_commands = false
 auto_approve = ["file_read", "file_write", "memory_recall", "memory_store",
-                "web_search_tool", "http_request", "git_operations", "shell"]
+                "web_search_tool", "http_request", "git_operations", "shell",
+                "gmail_read", "gmail_send", "gmail_draft"]
 
 # ── Web Search ───────────────────────────────────────────────
 [web_search]

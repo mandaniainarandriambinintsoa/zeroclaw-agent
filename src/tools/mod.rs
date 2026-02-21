@@ -11,6 +11,9 @@ pub mod delegate;
 pub mod file_read;
 pub mod file_write;
 pub mod git_operations;
+pub mod gmail_draft;
+pub mod gmail_read;
+pub mod gmail_send;
 pub mod hardware_board_info;
 pub mod hardware_memory_map;
 pub mod hardware_memory_read;
@@ -41,6 +44,9 @@ pub use delegate::DelegateTool;
 pub use file_read::FileReadTool;
 pub use file_write::FileWriteTool;
 pub use git_operations::GitOperationsTool;
+pub use gmail_draft::GmailDraftTool;
+pub use gmail_read::GmailReadTool;
+pub use gmail_send::GmailSendTool;
 pub use hardware_board_info::HardwareBoardInfoTool;
 pub use hardware_memory_map::HardwareMemoryMapTool;
 pub use hardware_memory_read::HardwareMemoryReadTool;
@@ -133,7 +139,7 @@ pub fn all_tools_with_runtime(
     root_config: &crate::config::Config,
 ) -> Vec<Box<dyn Tool>> {
     let mut tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(ShellTool::new(security.clone(), runtime)),
+        Box::new(ShellTool::new(security.clone(), runtime.clone())),
         Box::new(FileReadTool::new(security.clone())),
         Box::new(FileWriteTool::new(security.clone())),
         Box::new(CronAddTool::new(config.clone(), security.clone())),
@@ -155,6 +161,9 @@ pub fn all_tools_with_runtime(
             security.clone(),
             workspace_dir.to_path_buf(),
         )),
+        Box::new(GmailReadTool::new(security.clone(), runtime.clone())),
+        Box::new(GmailSendTool::new(security.clone(), runtime.clone())),
+        Box::new(GmailDraftTool::new(security.clone(), runtime.clone())),
     ];
 
     if browser_config.enabled {
