@@ -24,8 +24,9 @@ EOF
 fi
 
 # ── GitHub CLI auth ───────────────────────────────────────────
+# Persist token to gh config file (survives shell env_clear)
 if [ -n "$GITHUB_TOKEN" ]; then
-    export GH_TOKEN="$GITHUB_TOKEN"
+    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
     git config --global credential.helper store 2>/dev/null || true
 fi
 

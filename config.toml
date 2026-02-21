@@ -38,7 +38,8 @@ level = "full"
 workspace_only = false
 allowed_commands = ["git", "gh", "curl", "ls", "cat", "grep", "find", "echo",
                     "pwd", "wc", "head", "tail", "mkdir", "cp", "mv", "rm",
-                    "chmod", "tar", "unzip", "sed", "awk", "sort", "diff"]
+                    "chmod", "tar", "unzip", "sed", "awk", "sort", "diff",
+                    "sh", "bash"]
 forbidden_paths = ["/etc/shadow", "/etc/passwd", "/root/.ssh"]
 max_actions_per_hour = 200
 max_cost_per_day_cents = 0
