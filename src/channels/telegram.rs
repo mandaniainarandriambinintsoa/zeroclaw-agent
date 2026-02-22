@@ -361,9 +361,10 @@ impl TelegramChannel {
 
     /// Parse an incoming webhook update into a [`ChannelMessage`].
     ///
-    /// Returns `None` if the update is not a valid/authorized text message.
-    pub fn parse_webhook_update(&self, update: &serde_json::Value) -> Option<ChannelMessage> {
-        self.parse_update_message(update)
+    /// Returns `None` if the update is not a valid/authorized message.
+    /// Supports text, voice, and audio messages (voice/audio are transcribed via Whisper).
+    pub async fn parse_webhook_update(&self, update: &serde_json::Value) -> Option<ChannelMessage> {
+        self.parse_update_message_or_voice(update).await
     }
 
     /// Handle an unauthorized webhook update (pairing flow, rejection reply).
@@ -796,6 +797,186 @@ Allowlist Telegram username (without '@') or numeric user ID.",
                 ))
                 .await;
         }
+    }
+
+    /// Try text message first, then fall back to voice/audio transcription.
+    async fn parse_update_message_or_voice(
+        &self,
+        update: &serde_json::Value,
+    ) -> Option<ChannelMessage> {
+        // Try text first (fast path)
+        if let Some(msg) = self.parse_update_message(update) {
+            return Some(msg);
+        }
+
+        // Check for voice/audio message
+        let message = update.get("message")?;
+        let file_id = message
+            .get("voice")
+            .or_else(|| message.get("audio"))
+            .and_then(|v| v.get("file_id"))
+            .and_then(serde_json::Value::as_str)?;
+
+        // Authorization check (same logic as parse_update_message)
+        let username = message
+            .get("from")
+            .and_then(|from| from.get("username"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string();
+
+        let sender_id = message
+            .get("from")
+            .and_then(|from| from.get("id"))
+            .and_then(serde_json::Value::as_i64)
+            .map(|id| id.to_string());
+
+        let sender_identity = if username == "unknown" {
+            sender_id.clone().unwrap_or_else(|| "unknown".to_string())
+        } else {
+            username.clone()
+        };
+
+        let mut identities = vec![username.as_str()];
+        if let Some(id) = sender_id.as_deref() {
+            identities.push(id);
+        }
+
+        if !self.is_any_user_allowed(identities.iter().copied()) {
+            return None;
+        }
+
+        // Voice messages in mention_only groups: skip mention check (voice has no text to mention)
+        // but still require the message to be from an authorized user (checked above).
+        let chat_id = message
+            .get("chat")
+            .and_then(|chat| chat.get("id"))
+            .and_then(serde_json::Value::as_i64)
+            .map(|id| id.to_string())?;
+
+        let message_id = message
+            .get("message_id")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+
+        let thread_id = message
+            .get("message_thread_id")
+            .and_then(serde_json::Value::as_i64)
+            .map(|id| id.to_string());
+
+        let reply_target = if let Some(tid) = thread_id {
+            format!("{}:{}", chat_id, tid)
+        } else {
+            chat_id.clone()
+        };
+
+        // Transcribe
+        match self.transcribe_voice(file_id).await {
+            Ok(text) if !text.trim().is_empty() => {
+                tracing::info!(
+                    "Voice transcription from {}: {}",
+                    sender_identity,
+                    crate::util::truncate_with_ellipsis(&text, 80)
+                );
+                Some(ChannelMessage {
+                    id: format!("telegram_{chat_id}_{message_id}"),
+                    sender: sender_identity,
+                    reply_target,
+                    content: text,
+                    channel: "telegram".to_string(),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    thread_ts: None,
+                })
+            }
+            Ok(_) => {
+                tracing::warn!("Whisper returned empty transcription for voice message");
+                None
+            }
+            Err(e) => {
+                tracing::error!("Voice transcription failed: {e}");
+                None
+            }
+        }
+    }
+
+    /// Transcribe a voice/audio file via OpenAI Whisper API.
+    async fn transcribe_voice(&self, file_id: &str) -> anyhow::Result<String> {
+        // 1. Get file path from Telegram
+        let url = self.api_url("getFile");
+        let resp = self
+            .http_client()
+            .post(&url)
+            .json(&serde_json::json!({"file_id": file_id}))
+            .send()
+            .await
+            .context("Telegram getFile request failed")?;
+
+        let data: serde_json::Value = resp.json().await.context("Failed to parse getFile response")?;
+        let file_path = data["result"]["file_path"]
+            .as_str()
+            .context("Telegram getFile: missing file_path in response")?;
+
+        // 2. Download audio bytes
+        let download_url = format!(
+            "https://api.telegram.org/file/bot{}/{}",
+            self.bot_token, file_path
+        );
+        let audio_bytes = self
+            .http_client()
+            .get(&download_url)
+            .send()
+            .await
+            .context("Failed to download voice file from Telegram")?
+            .bytes()
+            .await
+            .context("Failed to read voice file bytes")?;
+
+        // 3. Determine filename/mime from file_path extension
+        let extension = file_path.rsplit('.').next().unwrap_or("ogg");
+        let (filename, mime) = match extension {
+            "oga" | "ogg" => ("voice.ogg", "audio/ogg"),
+            "mp3" => ("voice.mp3", "audio/mpeg"),
+            "m4a" => ("voice.m4a", "audio/mp4"),
+            "wav" => ("voice.wav", "audio/wav"),
+            _ => ("voice.ogg", "audio/ogg"),
+        };
+
+        // 4. Call OpenAI Whisper API
+        let api_key =
+            std::env::var("OPENAI_API_KEY").context("OPENAI_API_KEY not set for voice transcription")?;
+
+        let form = Form::new()
+            .part(
+                "file",
+                Part::bytes(audio_bytes.to_vec())
+                    .file_name(filename.to_string())
+                    .mime_str(mime)?,
+            )
+            .text("model", "whisper-1");
+
+        let resp = self
+            .http_client()
+            .post("https://api.openai.com/v1/audio/transcriptions")
+            .bearer_auth(&api_key)
+            .multipart(form)
+            .send()
+            .await
+            .context("Whisper API request failed")?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Whisper API error ({status}): {body}");
+        }
+
+        let result: serde_json::Value = resp.json().await.context("Failed to parse Whisper response")?;
+        result["text"]
+            .as_str()
+            .map(|s| s.to_string())
+            .context("Whisper response missing 'text' field")
     }
 
     fn parse_update_message(&self, update: &serde_json::Value) -> Option<ChannelMessage> {
@@ -1853,7 +2034,7 @@ Ensure only one `zeroclaw` process is using this bot token."
                         offset = uid + 1;
                     }
 
-                    let Some(msg) = self.parse_update_message(update) else {
+                    let Some(msg) = self.parse_update_message_or_voice(update).await else {
                         self.handle_unauthorized_message(update).await;
                         continue;
                     };

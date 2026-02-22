@@ -1277,11 +1277,11 @@ async fn handle_telegram_webhook(
         );
     };
 
-    // Parse the update into a channel message
-    let msg = match tg.parse_webhook_update(&update) {
+    // Parse the update into a channel message (supports text + voice/audio)
+    let msg = match tg.parse_webhook_update(&update).await {
         Some(m) => m,
         None => {
-            // Not authorized or not a text message — handle pairing/rejection.
+            // Not authorized or not a recognized message — handle pairing/rejection.
             let tg = Arc::clone(tg);
             let update = update.clone();
             tokio::spawn(async move {
