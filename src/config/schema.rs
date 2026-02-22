@@ -3538,6 +3538,9 @@ default_temperature = 0.7
                     draft_update_interval_ms: default_draft_update_interval_ms(),
                     interrupt_on_new_message: false,
                     mention_only: false,
+                    webhook_mode: false,
+                    webhook_url: None,
+                    webhook_secret: None,
                 }),
                 discord: None,
                 slack: None,
@@ -3871,6 +3874,9 @@ tool_dispatcher = "xml"
             draft_update_interval_ms: 500,
             interrupt_on_new_message: true,
             mention_only: false,
+            webhook_mode: false,
+            webhook_url: None,
+            webhook_secret: None,
         };
         let json = serde_json::to_string(&tc).unwrap();
         let parsed: TelegramConfig = serde_json::from_str(&json).unwrap();
