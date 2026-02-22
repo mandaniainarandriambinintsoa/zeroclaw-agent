@@ -298,7 +298,7 @@ fn parse_attachment_markers(message: &str) -> (String, Vec<TelegramAttachment>) 
     (cleaned.trim().to_string(), attachments)
 }
 
-/// Telegram channel — long-polls the Bot API for updates
+/// Telegram channel — long-polls the Bot API for updates, or receives webhooks.
 pub struct TelegramChannel {
     bot_token: String,
     allowed_users: Arc<RwLock<Vec<String>>>,
@@ -310,6 +310,7 @@ pub struct TelegramChannel {
     last_draft_edit: Mutex<std::collections::HashMap<String, std::time::Instant>>,
     mention_only: bool,
     bot_username: Mutex<Option<String>>,
+    webhook_mode: bool,
 }
 
 impl TelegramChannel {
@@ -337,6 +338,7 @@ impl TelegramChannel {
             typing_handle: Mutex::new(None),
             mention_only,
             bot_username: Mutex::new(None),
+            webhook_mode: false,
         }
     }
 
@@ -349,6 +351,67 @@ impl TelegramChannel {
         self.stream_mode = stream_mode;
         self.draft_update_interval_ms = draft_update_interval_ms;
         self
+    }
+
+    /// Enable webhook mode (messages pushed by Telegram instead of polled).
+    pub fn with_webhook_mode(mut self, enabled: bool) -> Self {
+        self.webhook_mode = enabled;
+        self
+    }
+
+    /// Parse an incoming webhook update into a [`ChannelMessage`].
+    ///
+    /// Returns `None` if the update is not a valid/authorized text message.
+    pub fn parse_webhook_update(&self, update: &serde_json::Value) -> Option<ChannelMessage> {
+        self.parse_update_message(update)
+    }
+
+    /// Handle an unauthorized webhook update (pairing flow, rejection reply).
+    pub async fn handle_unauthorized_webhook_update(&self, update: &serde_json::Value) {
+        self.handle_unauthorized_message(update).await;
+    }
+
+    /// Register a webhook URL with the Telegram Bot API.
+    pub async fn set_webhook(&self, url: &str, secret_token: &str) -> anyhow::Result<()> {
+        let api_url = self.api_url("setWebhook");
+        let body = serde_json::json!({
+            "url": url,
+            "secret_token": secret_token,
+            "allowed_updates": ["message"],
+        });
+        let resp = self
+            .http_client()
+            .post(&api_url)
+            .json(&body)
+            .send()
+            .await
+            .context("setWebhook request failed")?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            anyhow::bail!("Telegram setWebhook failed ({status}): {text}");
+        }
+        tracing::info!("Telegram webhook registered: {url}");
+        Ok(())
+    }
+
+    /// Remove a previously registered webhook.
+    pub async fn delete_webhook(&self) -> anyhow::Result<()> {
+        let api_url = self.api_url("deleteWebhook");
+        let resp = self
+            .http_client()
+            .post(&api_url)
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .context("deleteWebhook request failed")?;
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Telegram deleteWebhook failed ({status}): {text}");
+        }
+        tracing::info!("Telegram webhook deleted");
+        Ok(())
     }
 
     /// Parse reply_target into (chat_id, optional thread_id).
@@ -1695,6 +1758,23 @@ impl Channel for TelegramChannel {
     }
 
     async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+        if self.webhook_mode {
+            // In webhook mode, messages arrive via the gateway /telegram endpoint.
+            // Keep the channel task alive so the runtime doesn't exit.
+            tracing::info!(
+                "Telegram channel active (webhook mode). \
+                Messages are received via the gateway /telegram endpoint."
+            );
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            }
+        }
+
+        // Polling mode — clean up any residual webhook first.
+        if let Err(e) = self.delete_webhook().await {
+            tracing::warn!("Failed to clear residual Telegram webhook: {e}");
+        }
+
         let mut offset: i64 = 0;
 
         if self.mention_only {

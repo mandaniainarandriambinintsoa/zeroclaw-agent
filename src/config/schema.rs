@@ -2133,6 +2133,18 @@ pub struct TelegramConfig {
     /// Direct messages are always processed.
     #[serde(default)]
     pub mention_only: bool,
+    /// When true, receive messages via webhook (push) instead of polling.
+    /// Requires the gateway to be running and publicly accessible.
+    #[serde(default)]
+    pub webhook_mode: bool,
+    /// Public URL for the Telegram webhook (e.g. `https://example.com`).
+    /// The `/telegram` path is appended automatically.
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+    /// Secret token for verifying incoming webhook requests.
+    /// If not set, one is auto-generated at startup.
+    #[serde(default)]
+    pub webhook_secret: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

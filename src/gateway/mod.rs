@@ -7,7 +7,7 @@
 //! - Request timeouts (30s) to prevent slow-loris attacks
 //! - Header sanitization (handled by axum/hyper)
 
-use crate::channels::{Channel, LinqChannel, SendMessage, WhatsAppChannel};
+use crate::channels::{Channel, LinqChannel, SendMessage, TelegramChannel, WhatsAppChannel};
 use crate::config::Config;
 use crate::memory::{self, Memory, MemoryCategory};
 use crate::providers::{self, ChatMessage, Provider, ProviderCapabilityError};
@@ -55,6 +55,10 @@ fn whatsapp_memory_key(msg: &crate::channels::traits::ChannelMessage) -> String 
 
 fn linq_memory_key(msg: &crate::channels::traits::ChannelMessage) -> String {
     format!("linq_{}_{}", msg.sender, msg.id)
+}
+
+fn telegram_memory_key(msg: &crate::channels::traits::ChannelMessage) -> String {
+    format!("telegram_{}_{}", msg.sender, msg.id)
 }
 
 fn hash_webhook_secret(value: &str) -> String {
@@ -281,6 +285,10 @@ pub struct AppState {
     pub linq: Option<Arc<LinqChannel>>,
     /// Linq webhook signing secret for signature verification
     pub linq_signing_secret: Option<Arc<str>>,
+    /// Telegram channel for webhook mode
+    pub telegram: Option<Arc<TelegramChannel>>,
+    /// Secret token for verifying `X-Telegram-Bot-Api-Secret-Token`
+    pub telegram_webhook_secret: Option<Arc<str>>,
     /// Observability backend for metrics scraping
     pub observer: Arc<dyn crate::observability::Observer>,
 }
@@ -429,6 +437,39 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         })
         .map(Arc::from);
 
+    // Telegram channel (webhook mode only)
+    let telegram_channel: Option<Arc<TelegramChannel>> = config
+        .channels_config
+        .telegram
+        .as_ref()
+        .filter(|tg| tg.webhook_mode)
+        .map(|tg| {
+            Arc::new(
+                TelegramChannel::new(
+                    tg.bot_token.clone(),
+                    tg.allowed_users.clone(),
+                    tg.mention_only,
+                )
+                .with_streaming(tg.stream_mode, tg.draft_update_interval_ms)
+                .with_webhook_mode(true),
+            )
+        });
+
+    // Telegram webhook secret
+    // Priority: config > auto-generated UUID
+    let telegram_webhook_secret: Option<Arc<str>> = if telegram_channel.is_some() {
+        let secret = config
+            .channels_config
+            .telegram
+            .as_ref()
+            .and_then(|tg| tg.webhook_secret.clone())
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        Some(Arc::from(secret.as_str()))
+    } else {
+        None
+    };
+
     // ── Pairing guard ──────────────────────────────────────
     let pairing = Arc::new(PairingGuard::new(
         config.gateway.require_pairing,
@@ -470,6 +511,21 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         }
     }
 
+    // Register Telegram webhook if configured
+    if let (Some(ref tg), Some(ref secret)) = (&telegram_channel, &telegram_webhook_secret) {
+        let webhook_base = config
+            .channels_config
+            .telegram
+            .as_ref()
+            .and_then(|t| t.webhook_url.clone())
+            .or_else(|| tunnel_url.clone())
+            .unwrap_or_else(|| format!("http://{display_addr}"));
+        let webhook_url = format!("{}/telegram", webhook_base.trim_end_matches('/'));
+        if let Err(e) = tg.set_webhook(&webhook_url, secret).await {
+            tracing::error!("Failed to register Telegram webhook: {e}");
+        }
+    }
+
     println!("🦀 ZeroClaw Gateway listening on http://{display_addr}");
     if let Some(ref url) = tunnel_url {
         println!("  🌐 Public URL: {url}");
@@ -482,6 +538,9 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
     }
     if linq_channel.is_some() {
         println!("  POST /linq      — Linq message webhook (iMessage/RCS/SMS)");
+    }
+    if telegram_channel.is_some() {
+        println!("  POST /telegram  — Telegram message webhook");
     }
     println!("  GET  /health    — health check");
     println!("  GET  /metrics   — Prometheus metrics");
@@ -521,6 +580,8 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         whatsapp_app_secret,
         linq: linq_channel,
         linq_signing_secret,
+        telegram: telegram_channel,
+        telegram_webhook_secret,
         observer,
     };
 
@@ -533,6 +594,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/whatsapp", get(handle_whatsapp_verify))
         .route("/whatsapp", post(handle_whatsapp_message))
         .route("/linq", post(handle_linq_webhook))
+        .route("/telegram", post(handle_telegram_webhook))
         .with_state(state)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_SIZE))
         .layer(TimeoutLayer::with_status_code(
@@ -1179,6 +1241,109 @@ async fn handle_linq_webhook(
     (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
 }
 
+/// POST /telegram — incoming Telegram webhook update
+async fn handle_telegram_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> impl IntoResponse {
+    let Some(ref tg) = state.telegram else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Telegram webhook not configured"})),
+        );
+    };
+
+    // Verify X-Telegram-Bot-Api-Secret-Token
+    if let Some(ref expected) = state.telegram_webhook_secret {
+        let provided = headers
+            .get("X-Telegram-Bot-Api-Secret-Token")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !constant_time_eq(provided, expected) {
+            tracing::warn!("Telegram webhook secret mismatch");
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "Invalid secret token"})),
+            );
+        }
+    }
+
+    // Parse JSON body
+    let Ok(update) = serde_json::from_slice::<serde_json::Value>(&body) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "Invalid JSON payload"})),
+        );
+    };
+
+    // Parse the update into a channel message
+    let msg = match tg.parse_webhook_update(&update) {
+        Some(m) => m,
+        None => {
+            // Not authorized or not a text message — handle pairing/rejection.
+            let tg = Arc::clone(tg);
+            let update = update.clone();
+            tokio::spawn(async move {
+                tg.handle_unauthorized_webhook_update(&update).await;
+            });
+            return (StatusCode::OK, Json(serde_json::json!({"status": "ok"})));
+        }
+    };
+
+    tracing::info!(
+        "Telegram webhook message from {}: {}",
+        msg.sender,
+        truncate_with_ellipsis(&msg.content, 50)
+    );
+
+    // Spawn async processing — return 200 immediately to avoid Telegram retries.
+    let tg = Arc::clone(tg);
+    let state = state.clone();
+    tokio::spawn(async move {
+        // Send typing indicator
+        let _ = tg.start_typing(&msg.reply_target).await;
+
+        // Auto-save to memory
+        if state.auto_save {
+            let key = telegram_memory_key(&msg);
+            let _ = state
+                .mem
+                .store(&key, &msg.content, MemoryCategory::Conversation, None)
+                .await;
+        }
+
+        let provider_label = state
+            .config
+            .lock()
+            .default_provider
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+
+        match run_gateway_chat_with_multimodal(&state, &provider_label, &msg.content).await {
+            Ok(response) => {
+                if let Err(e) = tg
+                    .send(&SendMessage::new(response, &msg.reply_target))
+                    .await
+                {
+                    tracing::error!("Failed to send Telegram reply: {e}");
+                }
+            }
+            Err(e) => {
+                tracing::error!("LLM error for Telegram webhook message: {e:#}");
+                let _ = tg
+                    .send(&SendMessage::new(
+                        "Sorry, I couldn't process your message right now.",
+                        &msg.reply_target,
+                    ))
+                    .await;
+            }
+        }
+    });
+
+    (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1255,6 +1420,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 
@@ -1298,6 +1465,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer,
         };
 
@@ -1658,6 +1827,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 
@@ -1716,6 +1887,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 
@@ -1786,6 +1959,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 
@@ -1828,6 +2003,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 
@@ -1875,6 +2052,8 @@ mod tests {
             whatsapp_app_secret: None,
             linq: None,
             linq_signing_secret: None,
+            telegram: None,
+            telegram_webhook_secret: None,
             observer: Arc::new(crate::observability::NoopObserver),
         };
 

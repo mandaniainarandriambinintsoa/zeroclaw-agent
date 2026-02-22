@@ -92,3 +92,6 @@ bot_token = ""
 allowed_users = ["8202028798"]
 interrupt_on_new_message = true
 mention_only = false
+# webhook_mode = true
+# webhook_url = "https://zeroclaw-agent.onrender.com"
+# webhook_secret = ""  # auto-generated if empty

@@ -10,6 +10,14 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
     sed -i "s|bot_token = \"\"|bot_token = \"$TELEGRAM_BOT_TOKEN\"|" "$CONFIG"
 fi
 
+# Inject Telegram webhook mode settings
+if [ "$TELEGRAM_WEBHOOK_MODE" = "true" ]; then
+    sed -i "/^\[channels_config\.telegram\]/a webhook_mode = true" "$CONFIG"
+fi
+if [ -n "$TELEGRAM_WEBHOOK_URL" ]; then
+    sed -i "/^\[channels_config\.telegram\]/a webhook_url = \"$TELEGRAM_WEBHOOK_URL\"" "$CONFIG"
+fi
+
 # ── Google OAuth credentials (for Gmail API) ──────────────────
 # MUST be inside workspace so file_read tool can access it
 CRED_DIR=/zeroclaw-data/workspace/credentials
