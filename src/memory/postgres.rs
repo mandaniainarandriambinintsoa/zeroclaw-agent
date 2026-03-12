@@ -42,11 +42,9 @@ impl PostgresMemory {
         // Build a rustls TLS connector for Neon (and any SSL-requiring PG host).
         let mut root_store = rustls::RootCertStore::empty();
         root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let tls_config = Arc::new(
-            rustls::ClientConfig::builder()
-                .with_root_certificates(root_store)
-                .with_no_client_auth(),
-        );
+        let tls_config = rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
         let tls = tokio_postgres_rustls::MakeRustlsConnect::new(tls_config);
 
         let mut client = config
