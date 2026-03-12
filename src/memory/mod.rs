@@ -262,12 +262,17 @@ pub fn create_memory_with_storage_and_routes(
                 "memory backend 'postgres' requires [storage.provider.config].db_url (or dbURL)",
             )?;
 
-        PostgresMemory::new(
-            db_url,
-            &storage_provider.schema,
-            &storage_provider.table,
-            storage_provider.connect_timeout_secs,
-        )
+        // The sync `postgres` crate uses `block_on` internally for TLS/connection,
+        // which panics when called inside an existing tokio runtime.  Move the
+        // blocking connect to a dedicated OS thread to avoid the conflict.
+        let db_url = db_url.to_string();
+        let schema = storage_provider.schema.clone();
+        let table = storage_provider.table.clone();
+        let timeout = storage_provider.connect_timeout_secs;
+
+        std::thread::spawn(move || PostgresMemory::new(&db_url, &schema, &table, timeout))
+            .join()
+            .map_err(|_| anyhow::anyhow!("PostgreSQL memory init thread panicked"))?
     }
 
     create_memory_with_builders(
