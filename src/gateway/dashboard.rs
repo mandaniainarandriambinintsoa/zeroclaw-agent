@@ -14,6 +14,7 @@ use axum::{
 };
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -166,7 +167,7 @@ impl DashboardLogStore {
     pub fn push(&self, level: &str, component: &str, message: &str) {
         let entry = LogEntry {
             id: Uuid::new_v4().to_string(),
-            timestamp: humantime::format_rfc3339(SystemTime::now()).to_string(),
+            timestamp: Utc::now().to_rfc3339(),
             level: level.to_string(),
             component: component.to_string(),
             message: message.to_string(),
@@ -680,8 +681,8 @@ async fn handle_channels(State(state): State<AppState>) -> impl IntoResponse {
                         c.sent,
                         c.last_activity.map(|t| {
                             let elapsed = t.elapsed();
-                            let sys = SystemTime::now() - elapsed;
-                            humantime::format_rfc3339(sys).to_string()
+                            let dt = Utc::now() - chrono::Duration::from_std(elapsed).unwrap_or_default();
+                            dt.to_rfc3339()
                         }),
                     )
                 })

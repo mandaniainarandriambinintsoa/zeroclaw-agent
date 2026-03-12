@@ -80,8 +80,6 @@ serde-big-array = { version = "0.5", optional = true }
 # Fast mutexes that don't poison on panic
 parking_lot = "0.12"
 
-# Human-readable timestamps (RFC 3339)
-humantime = "2.1"
 
 # Async traits
 async-trait = "0.1"
