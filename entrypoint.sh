@@ -47,7 +47,9 @@ fi
 
 # ── PostgreSQL connection URL (Neon) ──────────────────────────
 if [ -n "$ZEROCLAW_POSTGRES_URL" ]; then
-    sed -i "s|db_url = \"\"|db_url = \"$ZEROCLAW_POSTGRES_URL\"|" "$CONFIG"
+    # Escape sed special chars in URL (& and | and \)
+    ESCAPED_PG_URL=$(printf '%s\n' "$ZEROCLAW_POSTGRES_URL" | sed 's/[&|\\]/\\&/g')
+    sed -i "s|db_url = \"\"|db_url = \"${ESCAPED_PG_URL}\"|" "$CONFIG"
 fi
 
 # ── Git config (required for commits) ─────────────────────────
