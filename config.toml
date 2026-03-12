@@ -75,11 +75,29 @@ allowed_domains = [
     "slides.googleapis.com"
 ]
 
-# ── Memory (SQLite - lightweight, no external deps) ────────
+# ── Memory (PostgreSQL - persistent across deploys) ────────
 [memory]
-backend = "sqlite"
+backend = "postgres"
 auto_save = true
 embedding_provider = "none"
+
+# ── Storage Provider (Neon PostgreSQL) ─────────────────────
+[storage.provider.config]
+provider = "postgres"
+db_url = ""
+schema = "public"
+table = "memories"
+
+# ── Scheduler ──────────────────────────────────────────────────
+[scheduler]
+enabled = true
+max_tasks = 64
+max_concurrent = 4
+
+# ── Cron ──────────────────────────────────────────────────────
+[cron]
+enabled = true
+max_run_history = 50
 
 # ── Channel Timeout ──────────────────────────────────────────
 [channels_config]

@@ -45,6 +45,11 @@ GHEOF
     git config --global credential.helper store 2>/dev/null || true
 fi
 
+# ── PostgreSQL connection URL (Neon) ──────────────────────────
+if [ -n "$ZEROCLAW_POSTGRES_URL" ]; then
+    sed -i "s|db_url = \"\"|db_url = \"$ZEROCLAW_POSTGRES_URL\"|" "$CONFIG"
+fi
+
 # ── Git config (required for commits) ─────────────────────────
 git config --global user.name "ZeroClaw Agent" 2>/dev/null || true
 git config --global user.email "zeroclaw@agent.local" 2>/dev/null || true
