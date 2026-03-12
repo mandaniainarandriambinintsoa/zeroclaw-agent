@@ -3,7 +3,7 @@
 //! All endpoints are mounted under `/api/` and return JSON.
 //! These endpoints are unauthenticated (dashboard auth is handled separately).
 
-use crate::memory::{Memory, MemoryCategory};
+use crate::memory::MemoryCategory;
 use crate::observability::traits::{ObserverEvent, ObserverMetric};
 use axum::{
     extract::{Query, State},
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use chrono::Utc;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use uuid::Uuid;
 
@@ -435,7 +435,19 @@ use super::AppState;
 
 /// GET /api/status
 async fn handle_status(State(state): State<AppState>) -> impl IntoResponse {
-    let config = state.config.lock();
+    // Extract all config data before any .await to keep the future Send
+    let (provider_name, memory_backend, gw_host, gw_port, tg_webhook, discord_active, slack_active) = {
+        let config = state.config.lock();
+        (
+            config.default_provider.clone().unwrap_or_else(|| "openrouter".into()),
+            config.memory.backend.clone(),
+            config.gateway.host.clone(),
+            config.gateway.port,
+            config.channels_config.telegram.as_ref().is_some_and(|t| t.webhook_mode),
+            config.channels_config.discord.is_some(),
+            config.channels_config.slack.is_some(),
+        )
+    };
 
     let memory_entries = match state.mem.count().await {
         Ok(n) => n as u64,
@@ -443,40 +455,22 @@ async fn handle_status(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     let mut channels = HashMap::new();
-    channels.insert(
-        "telegram".to_string(),
-        ChannelInfo {
-            active: state.telegram.is_some(),
-            webhook_mode: Some(
-                config
-                    .channels_config
-                    .telegram
-                    .as_ref()
-                    .is_some_and(|t| t.webhook_mode),
-            ),
-        },
-    );
-    channels.insert(
-        "whatsapp".to_string(),
-        ChannelInfo {
-            active: state.whatsapp.is_some(),
-            webhook_mode: None,
-        },
-    );
-    channels.insert(
-        "discord".to_string(),
-        ChannelInfo {
-            active: config.channels_config.discord.is_some(),
-            webhook_mode: None,
-        },
-    );
-    channels.insert(
-        "slack".to_string(),
-        ChannelInfo {
-            active: config.channels_config.slack.is_some(),
-            webhook_mode: None,
-        },
-    );
+    channels.insert("telegram".to_string(), ChannelInfo {
+        active: state.telegram.is_some(),
+        webhook_mode: Some(tg_webhook),
+    });
+    channels.insert("whatsapp".to_string(), ChannelInfo {
+        active: state.whatsapp.is_some(),
+        webhook_mode: None,
+    });
+    channels.insert("discord".to_string(), ChannelInfo {
+        active: discord_active,
+        webhook_mode: None,
+    });
+    channels.insert("slack".to_string(), ChannelInfo {
+        active: slack_active,
+        webhook_mode: None,
+    });
 
     let uptime = state
         .dashboard_metrics
@@ -484,24 +478,16 @@ async fn handle_status(State(state): State<AppState>) -> impl IntoResponse {
         .map(|m| m.start_time.elapsed().as_secs())
         .unwrap_or(0);
 
-    let resp = StatusResponse {
+    Json(StatusResponse {
         status: "running".to_string(),
         uptime_secs: uptime,
-        provider: config
-            .default_provider
-            .clone()
-            .unwrap_or_else(|| "openrouter".into()),
+        provider: provider_name,
         model: state.model.clone(),
-        memory_backend: config.memory.backend.clone(),
+        memory_backend,
         memory_entries,
         channels,
-        gateway: GatewayInfo {
-            host: config.gateway.host.clone(),
-            port: config.gateway.port,
-        },
-    };
-
-    Json(resp)
+        gateway: GatewayInfo { host: gw_host, port: gw_port },
+    })
 }
 
 /// GET /api/metrics
@@ -706,9 +692,10 @@ async fn handle_channels(State(state): State<AppState>) -> impl IntoResponse {
 
 /// GET /api/memory/stats
 async fn handle_memory_stats(State(state): State<AppState>) -> impl IntoResponse {
-    let config = state.config.lock();
-    let backend = config.memory.backend.clone();
-    drop(config);
+    let backend = {
+        let config = state.config.lock();
+        config.memory.backend.clone()
+    };
 
     let total = state.mem.count().await.unwrap_or(0) as u64;
     let health = state.mem.health_check().await;
