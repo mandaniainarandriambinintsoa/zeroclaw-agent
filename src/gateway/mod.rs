@@ -7,6 +7,8 @@
 //! - Request timeouts (30s) to prevent slow-loris attacks
 //! - Header sanitization (handled by axum/hyper)
 
+pub mod dashboard;
+
 use crate::channels::{Channel, LinqChannel, SendMessage, TelegramChannel, WhatsAppChannel};
 use crate::config::Config;
 use crate::memory::{self, Memory, MemoryCategory};
@@ -291,6 +293,10 @@ pub struct AppState {
     pub telegram_webhook_secret: Option<Arc<str>>,
     /// Observability backend for metrics scraping
     pub observer: Arc<dyn crate::observability::Observer>,
+    /// Dashboard metrics collector (populated when dashboard observer is active)
+    pub dashboard_metrics: Option<Arc<dashboard::DashboardMetrics>>,
+    /// Dashboard log store (populated when dashboard observer is active)
+    pub dashboard_logs: Option<Arc<dashboard::DashboardLogStore>>,
 }
 
 /// Run the HTTP gateway using axum with proper HTTP/1.1 compliance.
@@ -544,6 +550,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
     }
     println!("  GET  /health    — health check");
     println!("  GET  /metrics   — Prometheus metrics");
+    println!("  GET  /api/*     — Dashboard API (status, metrics, logs, channels, memory)");
     if let Some(code) = pairing.pairing_code() {
         println!();
         println!("  🔐 PAIRING REQUIRED — use this one-time code:");
@@ -560,9 +567,12 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
 
     crate::health::mark_component_ok("gateway");
 
-    // Build shared state
-    let observer: Arc<dyn crate::observability::Observer> =
-        Arc::from(crate::observability::create_observer(&config.observability));
+    // Build shared state — wrap observer with DashboardObserver for metrics/logs collection
+    let inner_observer = crate::observability::create_observer(&config.observability);
+    let dashboard_observer = dashboard::DashboardObserver::new(inner_observer);
+    let dashboard_metrics = Some(Arc::clone(&dashboard_observer.metrics));
+    let dashboard_logs = Some(Arc::clone(&dashboard_observer.logs));
+    let observer: Arc<dyn crate::observability::Observer> = Arc::new(dashboard_observer);
 
     let state = AppState {
         config: config_state,
@@ -583,7 +593,15 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         telegram: telegram_channel,
         telegram_webhook_secret,
         observer,
+        dashboard_metrics,
+        dashboard_logs,
     };
+
+    // Dashboard API CORS origins (dev default + configurable)
+    let cors_origins = vec![
+        "http://localhost:3000".to_string(),
+        "http://localhost:3001".to_string(),
+    ];
 
     // Build router with middleware
     let app = Router::new()
@@ -595,6 +613,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/whatsapp", post(handle_whatsapp_message))
         .route("/linq", post(handle_linq_webhook))
         .route("/telegram", post(handle_telegram_webhook))
+        .nest("/api", dashboard::api_router(&cors_origins))
         .with_state(state)
         .layer(RequestBodyLimitLayer::new(MAX_BODY_SIZE))
         .layer(TimeoutLayer::with_status_code(
