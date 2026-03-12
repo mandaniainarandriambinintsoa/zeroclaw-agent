@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
-use postgres::{Client, NoTls, Row};
+use postgres::{Client, Row};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
@@ -39,8 +39,18 @@ impl PostgresMemory {
             config.connect_timeout(Duration::from_secs(bounded));
         }
 
+        // Build a rustls TLS connector for Neon (and any SSL-requiring PG host).
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        let tls_config = Arc::new(
+            rustls::ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_no_client_auth(),
+        );
+        let tls = tokio_postgres_rustls::MakeRustlsConnect::new(tls_config);
+
         let mut client = config
-            .connect(NoTls)
+            .connect(tls)
             .context("failed to connect to PostgreSQL memory backend")?;
 
         let schema_ident = quote_identifier(schema);

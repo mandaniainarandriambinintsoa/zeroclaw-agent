@@ -22,7 +22,7 @@ RUN mkdir -p src benches crates/robot-kit/src \
     && echo "fn main() {}" > benches/agent_benchmarks.rs \
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs
 
-RUN cargo build --release --locked
+RUN cargo build --release
 RUN rm -rf src benches crates/robot-kit/src
 
 # 2. Copy actual source and build
@@ -31,7 +31,7 @@ COPY benches/ benches/
 COPY crates/ crates/
 COPY firmware/ firmware/
 
-RUN cargo build --release --locked && \
+RUN cargo build --release && \
     cp target/release/zeroclaw /app/zeroclaw && \
     strip /app/zeroclaw
 
