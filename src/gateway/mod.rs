@@ -597,11 +597,8 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         dashboard_logs,
     };
 
-    // Dashboard API CORS origins (dev default + configurable)
-    let cors_origins = vec![
-        "http://localhost:3000".to_string(),
-        "http://localhost:3001".to_string(),
-    ];
+    // Dashboard API CORS: allow any origin (read-only monitoring API)
+    let cors_origins: Vec<String> = vec![];
 
     // Build router with middleware
     let app = Router::new()
