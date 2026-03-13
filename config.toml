@@ -72,7 +72,8 @@ allowed_domains = [
     "youtube.googleapis.com",
     "www.blogger.com",
     "tasks.googleapis.com",
-    "slides.googleapis.com"
+    "slides.googleapis.com",
+    "growthpilot-nine.vercel.app"
 ]
 
 # ── Memory (PostgreSQL - persistent across deploys) ────────
