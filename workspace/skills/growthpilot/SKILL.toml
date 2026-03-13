@@ -1,0 +1,48 @@
+[skill]
+name = "growthpilot"
+description = "Autonomous content marketing agent — scrape sites, generate posts for 7 platforms, schedule and publish to social media via GrowthPilot API"
+version = "0.1.0"
+author = "Manda"
+tags = ["marketing", "social-media", "content", "automation", "growth"]
+
+# ── Scraping ──
+[[tools]]
+name = "gp_scrape"
+description = "Scrape a website URL to extract title, description, keywords, features for content generation"
+kind = "http"
+command = "POST https://growthpilot-nine.vercel.app/api/scrape"
+
+# ── Content Generation ──
+[[tools]]
+name = "gp_generate"
+description = "Generate a social media post for a specific platform using AI (Gemini/Groq). Platforms: twitter, linkedin, reddit, facebook, instagram, tiktok, youtube. Tones: professional, casual, viral."
+kind = "http"
+command = "POST https://growthpilot-nine.vercel.app/api/generate"
+
+# ── Projects CRUD ──
+[[tools]]
+name = "gp_projects"
+description = "Manage GrowthPilot projects — create (POST), list (GET), delete (DELETE)"
+kind = "http"
+command = "https://growthpilot-nine.vercel.app/api/projects"
+
+# ── Posts CRUD ──
+[[tools]]
+name = "gp_posts"
+description = "Manage posts — save (POST), list by project (GET), update content/status/schedule (PATCH), delete (DELETE)"
+kind = "http"
+command = "https://growthpilot-nine.vercel.app/api/posts"
+
+# ── Publish to Social ──
+[[tools]]
+name = "gp_publish"
+description = "Publish a post to a connected social media account (Twitter, LinkedIn, Facebook, Reddit)"
+kind = "http"
+command = "POST https://growthpilot-nine.vercel.app/api/social"
+
+# ── Image Generation ──
+[[tools]]
+name = "gp_image"
+description = "Generate an image for a post using Gemini 2.0 Flash Exp"
+kind = "http"
+command = "POST https://growthpilot-nine.vercel.app/api/image"
